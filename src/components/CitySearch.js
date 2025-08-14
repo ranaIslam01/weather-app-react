@@ -1,111 +1,150 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios'; // axios ব্যবহার করা ভালো অভ্যাস
 import './CitySearch.css';
 
-const CitySearch = ({ isOpen, onClose, onCitySelect }) => {
+// Props থেকে apiKey গ্রহণ করা হচ্ছে
+const CitySearch = ({ isOpen, onClose, onCitySelect, apiKey }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [favoritesCities, setFavoritesCities] = useState([]);
+  const [results, setResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [favorites, setFavorites] = useState([]);
 
   // Popular cities for quick access
   const popularCities = [
-    { name: 'Dhaka', country: 'Bangladesh', lat: 23.8103, lon: 90.4125 },
-    { name: 'Chittagong', country: 'Bangladesh', lat: 22.3569, lon: 91.7832 },
-    { name: 'Sylhet', country: 'Bangladesh', lat: 24.8949, lon: 91.8687 },
-    { name: 'New York', country: 'United States', lat: 40.7128, lon: -74.0060 },
-    { name: 'London', country: 'United Kingdom', lat: 51.5074, lon: -0.1278 },
-    { name: 'Tokyo', country: 'Japan', lat: 35.6762, lon: 139.6503 },
-    { name: 'Paris', country: 'France', lat: 48.8566, lon: 2.3522 },
-    { name: 'Dubai', country: 'UAE', lat: 25.2048, lon: 55.2708 }
+    { name: 'Dhaka', country: 'BD', lat: 23.8103, lon: 90.4125 },
+    { name: 'New York', country: 'US', lat: 40.7128, lon: -74.0060 },
+    { name: 'London', country: 'GB', lat: 51.5074, lon: -0.1278 },
+    { name: 'Tokyo', country: 'JP', lat: 35.6762, lon: 139.6503 },
+    { name: 'Dubai', country: 'AE', lat: 25.2048, lon: 55.2708 },
   ];
 
+  // localStorage থেকে ফেভারিট শহর লোড করা
   useEffect(() => {
-    // Load favorite cities from localStorage
-    const saved = localStorage.getItem('favoriteCities');
-    if (saved) {
-      setFavoritesCities(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem('favoriteCities');
+      if (saved) {
+        setFavorites(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error("Failed to load favorites from localStorage", error);
     }
   }, []);
 
-  useEffect(() => {
-    if (searchTerm.length > 2) {
-      searchCities();
-    } else {
-      setSearchResults([]);
+  // আসল API ব্যবহার করে শহর খোঁজার ফাংশন
+  const searchCities = useCallback(async (query) => {
+    if (query.length < 3) {
+      setResults([]);
+      return;
     }
-  }, [searchTerm]);
-
-  const searchCities = async () => {
-    setLoading(true);
+    setIsLoading(true);
     try {
-      // Using a free geocoding API for city search
-      const response = await fetch(
-        `https://api.openweathermap.org/geo/1.0/direct?q=${searchTerm}&limit=5&appid=demo`
-      );
-      
-      // Since we don't have real API key, use mock data based on search term
-      const mockResults = popularCities.filter(city => 
-        city.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        city.country.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      
-      setSearchResults(mockResults);
+      const response = await axios.get(
+        'https://api.openweathermap.org/geo/1.0/direct',
+        {
+          params: {
+            q: query,
+            limit: 5,
+            appid: apiKey // Props থেকে পাওয়া আসল API কী ব্যবহার করা হচ্ছে
+          }
+        }
+       );
+      // API থেকে পাওয়া ডেটাকে UI-এর জন্য ফরম্যাট করা হচ্ছে
+      const formattedResults = response.data.map(city => ({
+        name: city.name,
+        country: city.country,
+        lat: city.lat,
+        lon: city.lon,
+        state: city.state || ''
+      }));
+      setResults(formattedResults);
     } catch (error) {
-      console.error('Error searching cities:', error);
-      // Fallback to local search in popular cities
-      const localResults = popularCities.filter(city => 
-        city.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setSearchResults(localResults);
+      console.error("Error searching cities:", error);
+      setResults([]); // এরর হলে রেজাল্ট খালি করে দেওয়া
+    } finally {
+      setIsLoading(false);
     }
-    setLoading(false);
-  };
+  }, [apiKey]); // apiKey পরিবর্তন হলে ফাংশনটি নতুন করে তৈরি হবে
 
-  const handleCitySelect = (city) => {
-    onCitySelect(city.lat, city.lon, `${city.name}, ${city.country}`);
+  // Debouncing: ব্যবহারকারী টাইপ করা থামালে তবেই API কল হবে
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchTerm.trim()) {
+        searchCities(searchTerm);
+      } else {
+        setResults([]);
+      }
+    }, 500); // ৫০০ মিলিসেকেন্ড অপেক্ষা করবে
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchTerm, searchCities]);
+
+  const handleSelectCity = (city) => {
+    // App.js-কে সঠিক ফরম্যাটে ডেটা পাঠানো হচ্ছে
+    onCitySelect({
+      value: `${city.lat},${city.lon}`,
+      label: `${city.name}, ${city.country}`
+    });
     onClose();
-    setSearchTerm('');
   };
 
-  const addToFavorites = (city) => {
-    const newFavorites = [...favoritesCities, city];
-    setFavoritesCities(newFavorites);
-    localStorage.setItem('favoriteCities', JSON.stringify(newFavorites));
+  const handleSelectCurrentLocation = () => {
+    onCitySelect({ value: 'current', label: 'Current Location' });
+    onClose();
   };
 
-  const removeFromFavorites = (cityToRemove) => {
-    const newFavorites = favoritesCities.filter(city => 
-      city.name !== cityToRemove.name || city.country !== cityToRemove.country
-    );
-    setFavoritesCities(newFavorites);
+  // ফেভারিট শহর যোগ বা حذف করার ফাংশন
+  const toggleFavorite = (city) => {
+    let newFavorites;
+    if (isFavorite(city)) {
+      newFavorites = favorites.filter(fav => fav.name !== city.name || fav.country !== city.country);
+    } else {
+      newFavorites = [...favorites, city];
+    }
+    setFavorites(newFavorites);
     localStorage.setItem('favoriteCities', JSON.stringify(newFavorites));
   };
 
   const isFavorite = (city) => {
-    return favoritesCities.some(fav => 
-      fav.name === city.name && fav.country === city.country
-    );
-  };
-
-  const getCurrentLocationWeather = () => {
-    onCitySelect(null, null, 'current');
-    onClose();
+    return favorites.some(fav => fav.name === city.name && fav.country === city.country);
   };
 
   if (!isOpen) return null;
 
+  // UI রেন্ডার করার জন্য একটি Helper ফাংশন
+  const renderCityList = (cities, listType) => (
+    <div className="city-list">
+      {cities.map((city, index) => (
+        <div key={`${listType}-${index}`} className="city-item">
+          <div className="city-info" onClick={() => handleSelectCity(city)}>
+            <span className="city-name">{city.name}</span>
+            <span className="city-country">{city.state ? `${city.state}, ` : ''}{city.country}</span>
+          </div>
+          <button
+            className={`favorite-btn ${isFavorite(city) ? 'favorited' : ''}`}
+            onClick={() => toggleFavorite(city)}
+            title={isFavorite(city) ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            {isFavorite(city) ? '❤️' : '🤍'}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="search-overlay">
-      <div className="search-modal">
+    <div className="search-overlay" onClick={onClose}>
+      <div className="search-modal" onClick={(e) => e.stopPropagation()}>
         <div className="search-header">
-          <h3>Search Cities</h3>
+          <h3>Search for a Location</h3>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
         <div className="search-input-container">
           <input
             type="text"
-            placeholder="Search for a city..."
+            placeholder="e.g., London, New York..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -115,99 +154,34 @@ const CitySearch = ({ isOpen, onClose, onCitySelect }) => {
         </div>
 
         <div className="search-content">
-          {/* Current Location Button */}
           <div className="section">
-            <button 
-              className="current-location-btn"
-              onClick={getCurrentLocationWeather}
-            >
+            <button className="current-location-btn" onClick={handleSelectCurrentLocation}>
               <span className="location-icon">📍</span>
               <span>Use Current Location</span>
             </button>
           </div>
 
-          {/* Search Results */}
-          {searchTerm && (
+          {searchTerm ? (
             <div className="section">
               <h4>Search Results</h4>
-              {loading ? (
-                <div className="loading-results">Searching...</div>
-              ) : searchResults.length > 0 ? (
-                <div className="city-list">
-                  {searchResults.map((city, index) => (
-                    <div key={index} className="city-item">
-                      <div 
-                        className="city-info"
-                        onClick={() => handleCitySelect(city)}
-                      >
-                        <span className="city-name">{city.name}</span>
-                        <span className="city-country">{city.country}</span>
-                      </div>
-                      <button
-                        className={`favorite-btn ${isFavorite(city) ? 'favorited' : ''}`}
-                        onClick={() => isFavorite(city) ? removeFromFavorites(city) : addToFavorites(city)}
-                      >
-                        {isFavorite(city) ? '❤️' : '🤍'}
-                      </button>
-                    </div>
-                  ))}
+              {isLoading ? <div className="loading-results">Searching...</div> :
+               results.length > 0 ? renderCityList(results, 'search') :
+               <div className="no-results">No cities found for "{searchTerm}"</div>
+              }
+            </div>
+          ) : (
+            <>
+              {favorites.length > 0 && (
+                <div className="section">
+                  <h4>Favorites</h4>
+                  {renderCityList(favorites, 'fav')}
                 </div>
-              ) : (
-                <div className="no-results">No cities found</div>
               )}
-            </div>
-          )}
-
-          {/* Favorite Cities */}
-          {favoritesCities.length > 0 && (
-            <div className="section">
-              <h4>Favorite Cities</h4>
-              <div className="city-list">
-                {favoritesCities.map((city, index) => (
-                  <div key={index} className="city-item">
-                    <div 
-                      className="city-info"
-                      onClick={() => handleCitySelect(city)}
-                    >
-                      <span className="city-name">{city.name}</span>
-                      <span className="city-country">{city.country}</span>
-                    </div>
-                    <button
-                      className="favorite-btn favorited"
-                      onClick={() => removeFromFavorites(city)}
-                    >
-                      ❤️
-                    </button>
-                  </div>
-                ))}
+              <div className="section">
+                <h4>Popular Cities</h4>
+                {renderCityList(popularCities, 'popular')}
               </div>
-            </div>
-          )}
-
-          {/* Popular Cities */}
-          {!searchTerm && (
-            <div className="section">
-              <h4>Popular Cities</h4>
-              <div className="city-list">
-                {popularCities.map((city, index) => (
-                  <div key={index} className="city-item">
-                    <div 
-                      className="city-info"
-                      onClick={() => handleCitySelect(city)}
-                    >
-                      <span className="city-name">{city.name}</span>
-                      <span className="city-country">{city.country}</span>
-                    </div>
-                    <button
-                      className={`favorite-btn ${isFavorite(city) ? 'favorited' : ''}`}
-                      onClick={() => isFavorite(city) ? removeFromFavorites(city) : addToFavorites(city)}
-                    >
-                      {isFavorite(city) ? '❤️' : '🤍'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>
