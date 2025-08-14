@@ -4,7 +4,7 @@
 
 **লাইভ ডেমো:** [https://weather-app-react-rana-01.vercel.app/](https://weather-app-react-rana-01.vercel.app/ )
 
-![React Weather App Demo](![alt text](image.png)) <!-- আপনি এখানে আপনার অ্যাপের একটি নতুন এবং সুন্দর স্ক্রিনশট যোগ করতে পারেন -->
+(![alt text](image.png) <!-- আপনি এখানে আপনার অ্যাপের একটি নতুন এবং সুন্দর স্ক্রিনশট যোগ করতে পারেন -->
 
 ---
 
