@@ -19,28 +19,29 @@ function App() {
     getCurrentLocation();
   }, []);
 
-  const fetchLocationByIp = async () => {
-    // --- পরিবর্তন ১: console.log ব্যবহার করা হচ্ছে ---
-    console.log("Attempting IP-based geolocation as a fallback...");
-    setLocation("Finding location by network...");
+    const fetchLocationByIp = async () => {
+    console.log('Attempting IP-based geolocation as a fallback...');
     try {
-      const response = await axios.get("https://ip-api.com/json");
-      const { city, lat, lon } = response.data;
-
-      if (city && lat && lon) {
-        setLocationStatus("fallback");
-        setLocation(`${city} (approximate)`);
-        fetchWeatherDataByCoords(lat, lon);
-      } else {
-        throw new Error("IP-based location data is incomplete.");
-      }
-    } catch (ipError) {
-      // --- পরিবর্তন ২: এই এররটি এখন আর দেখানো হবে না, কারণ এটি চূড়ান্ত ফলব্যাক দ্বারা সামলানো হচ্ছে ---
-      // console.error("IP Geolocation error:", ipError);
-      setLocation("Dhaka, Bangladesh (Default)");
-      fetchWeatherDataByCity("Dhaka");
+      const response = await axios.get('https://ipinfo.io/json?token=76f69fb30152f6' );
+      const { loc, city, country } = response.data;
+      const [lat, lon] = loc.split(',');
+      setLocation(`${city}, ${country} (IP Based)`);
+      fetchWeatherData(parseFloat(lat), parseFloat(lon), false);
+    } catch (error) {
+      console.error('IP Geolocation error:', error);
+      handleFinalFallback();
     }
   };
+    // চূড়ান্ত ফলব্যাক ফাংশন: যদি কোনো লোকেশন পদ্ধতিই কাজ না করে
+  const handleFinalFallback = () => {
+    console.log('All location methods failed. Using final fallback: Dhaka, BD.');
+    // একটি ডিফল্ট লোকেশন (যেমন, ঢাকা) সেট করা হচ্ছে
+    setLocation('Dhaka, Bangladesh (Default)');
+    setLocationStatus('fallback');
+    // ঢাকার lat/lon ব্যবহার করে আবহাওয়ার ডেটা আনা হচ্ছে
+    fetchWeatherData(23.8103, 90.4125, false);
+  };
+
 
   const getCurrentLocation = () => {
     setLocationStatus("detecting");
