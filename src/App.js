@@ -1,34 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './App.css';
-import WeatherChart from './components/WeatherChart';
-import CitySearch from './components/CitySearch';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import "./App.css";
+import WeatherChart from "./components/WeatherChart";
+import CitySearch from "./components/CitySearch";
 
 function App() {
   const [weatherData, setWeatherData] = useState(null);
-  const [location, setLocation] = useState('Detecting location...');
+  const [location, setLocation] = useState("Detecting location...");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [locationStatus, setLocationStatus] = useState('detecting');
+  const [locationStatus, setLocationStatus] = useState("detecting");
   const [showCitySearch, setShowCitySearch] = useState(false);
 
-  const API_KEY = 'a94b055c7a72e5dfd6e843a15193675e';
-  const API_BASE_URL = 'https://api.openweathermap.org/data/2.5';
+  const API_KEY = "a94b055c7a72e5dfd6e843a15193675e";
+  const API_BASE_URL = "https://api.openweathermap.org/data/2.5";
 
-  useEffect(( ) => {
+  useEffect(() => {
     getCurrentLocation();
   }, []);
 
   const fetchLocationByIp = async () => {
     // --- পরিবর্তন ১: console.log ব্যবহার করা হচ্ছে ---
     console.log("Attempting IP-based geolocation as a fallback...");
-    setLocation('Finding location by network...');
+    setLocation("Finding location by network...");
     try {
-      const response = await axios.get('http://ip-api.com/json' );
+      const response = await axios.get("https://ip-api.com/json");
       const { city, lat, lon } = response.data;
 
       if (city && lat && lon) {
-        setLocationStatus('fallback');
+        setLocationStatus("fallback");
         setLocation(`${city} (approximate)`);
         fetchWeatherDataByCoords(lat, lon);
       } else {
@@ -36,15 +36,15 @@ function App() {
       }
     } catch (ipError) {
       // --- পরিবর্তন ২: এই এররটি এখন আর দেখানো হবে না, কারণ এটি চূড়ান্ত ফলব্যাক দ্বারা সামলানো হচ্ছে ---
-      // console.error("IP Geolocation error:", ipError); 
-      setLocation('Dhaka, Bangladesh (Default)');
-      fetchWeatherDataByCity('Dhaka');
+      // console.error("IP Geolocation error:", ipError);
+      setLocation("Dhaka, Bangladesh (Default)");
+      fetchWeatherDataByCity("Dhaka");
     }
   };
 
   const getCurrentLocation = () => {
-    setLocationStatus('detecting');
-    setLocation('Detecting location...');
+    setLocationStatus("detecting");
+    setLocation("Detecting location...");
     setLoading(true);
     setError(null);
 
@@ -52,23 +52,28 @@ function App() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          setLocationStatus('success');
+          setLocationStatus("success");
           fetchWeatherDataByCoords(latitude, longitude);
         },
         (geoError) => {
           // --- পরিবর্তন ৩: console.error এর পরিবর্তে console.info ব্যবহার করা হচ্ছে ---
-          console.info("Browser geolocation failed. This is common. Proceeding with fallback.", `(${geoError.message})`);
+          console.info(
+            "Browser geolocation failed. This is common. Proceeding with fallback.",
+            `(${geoError.message})`
+          );
           fetchLocationByIp();
         },
         {
           enableHighAccuracy: true,
           timeout: 8000,
-          maximumAge: 0
+          maximumAge: 0,
         }
       );
     } else {
       // --- পরিবর্তন ৪: console.log ব্যবহার করা হচ্ছে ---
-      console.log('Browser geolocation is not supported. Proceeding with fallback.');
+      console.log(
+        "Browser geolocation is not supported. Proceeding with fallback."
+      );
       fetchLocationByIp();
     }
   };
@@ -80,7 +85,7 @@ function App() {
     setError(null);
     try {
       const response = await axios.get(`${API_BASE_URL}/weather`, {
-        params: { lat, lon, appid: API_KEY, units: 'metric' }
+        params: { lat, lon, appid: API_KEY, units: "metric" },
       });
       processWeatherData(response.data);
       setLocation(`${response.data.name}, ${response.data.sys.country}`);
@@ -96,7 +101,7 @@ function App() {
     setError(null);
     try {
       const response = await axios.get(`${API_BASE_URL}/weather`, {
-        params: { q: city, appid: API_KEY, units: 'metric' }
+        params: { q: city, appid: API_KEY, units: "metric" },
       });
       processWeatherData(response.data);
       setLocation(`${response.data.name}, ${response.data.sys.country}`);
@@ -116,46 +121,51 @@ function App() {
         details: {
           feels_like: Math.round(data.main.feels_like),
           wind_speed: Math.round(data.wind.speed * 3.6),
-          humidity: data.main.humidity
-        }
+          humidity: data.main.humidity,
+        },
       },
       weekly: Array.from({ length: 7 }, (_, i) => ({
-        day: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'][i],
+        day: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"][i],
         temp: Math.round(data.main.temp - 3 + Math.random() * 6),
         icon: data.weather[0].icon,
-        active: i === new Date().getDay() - 1
+        active: i === new Date().getDay() - 1,
       })),
       hourly: Array.from({ length: 4 }, (_, i) => ({
-        time: i === 0 ? 'NOW' : new Date().getHours() + i,
+        time: i === 0 ? "NOW" : new Date().getHours() + i,
         temp: Math.round(data.main.temp - 2 + Math.random() * 4),
         icon: data.weather[0].icon,
-        active: i === 0
+        active: i === 0,
       })),
       chartData: {
-        labels: ['-3h', '-2h', '-1h', 'Now', '+1h', '+2h', '+3h'],
-        temperatures: Array.from({ length: 7 }, () => Math.round(data.main.temp - 4 + Math.random() * 8))
-      }
+        labels: ["-3h", "-2h", "-1h", "Now", "+1h", "+2h", "+3h"],
+        temperatures: Array.from({ length: 7 }, () =>
+          Math.round(data.main.temp - 4 + Math.random() * 8)
+        ),
+      },
     };
     setWeatherData(processedData);
   };
 
   const handleApiError = (err) => {
-    console.error('API Error:', err);
-    let message = 'Could not fetch weather data.';
+    console.error("API Error:", err);
+    let message = "Could not fetch weather data.";
     if (err.response) {
-      message = err.response.status === 404 ? 'City not found.' : `Server error: ${err.response.status}`;
+      message =
+        err.response.status === 404
+          ? "City not found."
+          : `Server error: ${err.response.status}`;
     } else if (err.request) {
-      message = 'Network error. Check your connection.';
+      message = "Network error. Check your connection.";
     }
     setError(message);
   };
 
   const handleCitySelect = (city) => {
-    if (city && city.value === 'current') {
+    if (city && city.value === "current") {
       getCurrentLocation();
     } else if (city && city.label) {
-      const cityName = city.label.split(',')[0];
-      setLocationStatus('success');
+      const cityName = city.label.split(",")[0];
+      setLocationStatus("success");
       fetchWeatherDataByCity(cityName);
     }
     setShowCitySearch(false);
@@ -167,13 +177,28 @@ function App() {
   };
 
   const getWeatherIcon = (iconCode) => {
-    if (!iconCode) return '☁️';
+    if (!iconCode) return "☁️";
     const iconMapping = {
-      '01d': '☀️', '01n': '🌙', '02d': '⛅', '02n': '☁️', '03d': '☁️', '03n': '☁️',
-      '04d': '☁️', '04n': '☁️', '09d': '🌧️', '09n': '🌧️', '10d': '🌦️', '10n': '🌧️',
-      '11d': '⛈️', '11n': '⛈️', '13d': '❄️', '13n': '❄️', '50d': '🌫️', '50n': '🌫️',
+      "01d": "☀️",
+      "01n": "🌙",
+      "02d": "⛅",
+      "02n": "☁️",
+      "03d": "☁️",
+      "03n": "☁️",
+      "04d": "☁️",
+      "04n": "☁️",
+      "09d": "🌧️",
+      "09n": "🌧️",
+      "10d": "🌦️",
+      "10n": "🌧️",
+      "11d": "⛈️",
+      "11n": "⛈️",
+      "13d": "❄️",
+      "13n": "❄️",
+      "50d": "🌫️",
+      "50n": "🌫️",
     };
-    return iconMapping[iconCode] || '☁️';
+    return iconMapping[iconCode] || "☁️";
   };
 
   if (loading && !weatherData) {
@@ -221,12 +246,16 @@ function App() {
             <div className="location-details">
               <span className="location-text">{location}</span>
               <span className="location-status">
-                {locationStatus === 'success' && 'Current Location'}
-                {locationStatus === 'fallback' && 'Approximate Location'}
+                {locationStatus === "success" && "Current Location"}
+                {locationStatus === "fallback" && "Approximate Location"}
               </span>
             </div>
           </div>
-          <button className="add-location-btn" onClick={openCitySearch} title="Search for a city">
+          <button
+            className="add-location-btn"
+            onClick={openCitySearch}
+            title="Search for a city"
+          >
             <span className="search-icon">🔍</span>
           </button>
         </div>
@@ -242,25 +271,34 @@ function App() {
           </div>
         </div>
         <div className="weather-details">
-          <div className="detail-item" title="How the temperature actually feels">
+          <div
+            className="detail-item"
+            title="How the temperature actually feels"
+          >
             <span className="detail-icon">🌡️</span>
             <div className="detail-info">
               <span className="detail-label">Feels like</span>
-              <span className="detail-value">{weatherData.current.details.feels_like}°C</span>
+              <span className="detail-value">
+                {weatherData.current.details.feels_like}°C
+              </span>
             </div>
           </div>
           <div className="detail-item" title="Wind speed">
             <span className="detail-icon">💨</span>
             <div className="detail-info">
               <span className="detail-label">Wind</span>
-              <span className="detail-value">{weatherData.current.details.wind_speed} km/h</span>
+              <span className="detail-value">
+                {weatherData.current.details.wind_speed} km/h
+              </span>
             </div>
           </div>
           <div className="detail-item" title="Air moisture level">
             <span className="detail-icon">💧</span>
             <div className="detail-info">
               <span className="label">Humidity</span>
-              <span className="value">{weatherData.current.details.humidity}%</span>
+              <span className="value">
+                {weatherData.current.details.humidity}%
+              </span>
             </div>
           </div>
         </div>
@@ -268,7 +306,11 @@ function App() {
           <h3 className="section-title">7-Day Forecast</h3>
           <div className="week-days">
             {weatherData.weekly.map((day, index) => (
-              <div key={index} className={`day-item ${day.active ? 'active' : ''}`} title={`${day.day}: ${day.temp}°C`}>
+              <div
+                key={index}
+                className={`day-item ${day.active ? "active" : ""}`}
+                title={`${day.day}: ${day.temp}°C`}
+              >
                 <span className="day-name">{day.day}</span>
                 <div className="day-icon">{getWeatherIcon(day.icon)}</div>
                 <span className="day-temp">{day.temp}°</span>
@@ -280,7 +322,13 @@ function App() {
           <h3 className="section-title">Hourly Forecast</h3>
           <div className="hourly-items">
             {weatherData.hourly.map((hour, index) => (
-              <div key={index} className={`hourly-item ${hour.active ? 'active' : ''}`} title={`${hour.time === 'NOW' ? 'Current time' : hour.time + ':00'}: ${hour.temp}°C`}>
+              <div
+                key={index}
+                className={`hourly-item ${hour.active ? "active" : ""}`}
+                title={`${
+                  hour.time === "NOW" ? "Current time" : hour.time + ":00"
+                }: ${hour.temp}°C`}
+              >
                 <span className="hour-time">{hour.time}</span>
                 <div className="hour-icon">{getWeatherIcon(hour.icon)}</div>
                 <span className="hour-temp">{hour.temp}°</span>
@@ -293,7 +341,12 @@ function App() {
           <WeatherChart data={weatherData.chartData} />
         </div>
       </div>
-      <CitySearch isOpen={showCitySearch} onClose={() => setShowCitySearch(false)} onCitySelect={handleCitySelect} apiKey={API_KEY} />
+      <CitySearch
+        isOpen={showCitySearch}
+        onClose={() => setShowCitySearch(false)}
+        onCitySelect={handleCitySelect}
+        apiKey={API_KEY}
+      />
     </div>
   );
 }
