@@ -9,16 +9,38 @@ function App() {
   const [location, setLocation] = useState('Detecting location...');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [locationStatus, setLocationStatus] = useState('detecting'); // detecting, success, fallback, error
+  const [locationStatus, setLocationStatus] = useState('detecting');
   const [showCitySearch, setShowCitySearch] = useState(false);
 
-  // --- আপনার API কী ---
   const API_KEY = 'a94b055c7a72e5dfd6e843a15193675e';
   const API_BASE_URL = 'https://api.openweathermap.org/data/2.5';
 
   useEffect(( ) => {
     getCurrentLocation();
   }, []);
+
+  const fetchLocationByIp = async () => {
+    // --- পরিবর্তন ১: console.log ব্যবহার করা হচ্ছে ---
+    console.log("Attempting IP-based geolocation as a fallback...");
+    setLocation('Finding location by network...');
+    try {
+      const response = await axios.get('http://ip-api.com/json' );
+      const { city, lat, lon } = response.data;
+
+      if (city && lat && lon) {
+        setLocationStatus('fallback');
+        setLocation(`${city} (approximate)`);
+        fetchWeatherDataByCoords(lat, lon);
+      } else {
+        throw new Error("IP-based location data is incomplete.");
+      }
+    } catch (ipError) {
+      // --- পরিবর্তন ২: এই এররটি এখন আর দেখানো হবে না, কারণ এটি চূড়ান্ত ফলব্যাক দ্বারা সামলানো হচ্ছে ---
+      // console.error("IP Geolocation error:", ipError); 
+      setLocation('Dhaka, Bangladesh (Default)');
+      fetchWeatherDataByCity('Dhaka');
+    }
+  };
 
   const getCurrentLocation = () => {
     setLocationStatus('detecting');
@@ -34,57 +56,31 @@ function App() {
           fetchWeatherDataByCoords(latitude, longitude);
         },
         (geoError) => {
-          handleGeolocationError(geoError);
-          // ফলব্যাক হিসেবে ঢাকার ডেটা দেখানো হচ্ছে
-          setLocation('Dhaka, Bangladesh (Default)');
-          fetchWeatherDataByCity('Dhaka');
+          // --- পরিবর্তন ৩: console.error এর পরিবর্তে console.info ব্যবহার করা হচ্ছে ---
+          console.info("Browser geolocation failed. This is common. Proceeding with fallback.", `(${geoError.message})`);
+          fetchLocationByIp();
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 8000,
           maximumAge: 0
         }
       );
     } else {
-      console.log('Geolocation not supported, using default location');
-      setLocationStatus('fallback');
-      setLocation('Dhaka, Bangladesh (Default)');
-      fetchWeatherDataByCity('Dhaka');
+      // --- পরিবর্তন ৪: console.log ব্যবহার করা হচ্ছে ---
+      console.log('Browser geolocation is not supported. Proceeding with fallback.');
+      fetchLocationByIp();
     }
   };
 
-  const handleGeolocationError = (error) => {
-    let errorMessage = 'Could not detect your location.';
-    switch(error.code) {
-      case error.PERMISSION_DENIED:
-        errorMessage = 'Location access was denied.';
-        break;
-      case error.POSITION_UNAVAILABLE:
-        errorMessage = 'Location information is unavailable.';
-        break;
-      case error.TIMEOUT:
-        errorMessage = 'The request to get user location timed out.';
-        break;
-      default:
-        errorMessage = 'An unknown error occurred.';
-        break;
-    }
-    console.error('Geolocation error:', errorMessage);
-    setLocationStatus('fallback');
-  };
+  // --- বাকি কোডে কোনো পরিবর্তন নেই ---
 
-  // --- API থেকে ডেটা আনার ফাংশন (অক্ষাংশ ও দ্রাঘিমাংশ দিয়ে) ---
   const fetchWeatherDataByCoords = async (lat, lon) => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get(`${API_BASE_URL}/weather`, {
-        params: {
-          lat: lat,
-          lon: lon,
-          appid: API_KEY,
-          units: 'metric'
-        }
+        params: { lat, lon, appid: API_KEY, units: 'metric' }
       });
       processWeatherData(response.data);
       setLocation(`${response.data.name}, ${response.data.sys.country}`);
@@ -95,17 +91,12 @@ function App() {
     }
   };
 
-  // --- API থেকে ডেটা আনার ফাংশন (শহরের নাম দিয়ে) ---
   const fetchWeatherDataByCity = async (city) => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get(`${API_BASE_URL}/weather`, {
-        params: {
-          q: city,
-          appid: API_KEY,
-          units: 'metric'
-        }
+        params: { q: city, appid: API_KEY, units: 'metric' }
       });
       processWeatherData(response.data);
       setLocation(`${response.data.name}, ${response.data.sys.country}`);
@@ -116,7 +107,6 @@ function App() {
     }
   };
 
-  // --- API থেকে পাওয়া ডেটা প্রসেস করার ফাংশন ---
   const processWeatherData = (data) => {
     const processedData = {
       current: {
@@ -125,16 +115,15 @@ function App() {
         icon: data.weather[0].icon,
         details: {
           feels_like: Math.round(data.main.feels_like),
-          wind_speed: Math.round(data.wind.speed * 3.6), // m/s থেকে km/h
+          wind_speed: Math.round(data.wind.speed * 3.6),
           humidity: data.main.humidity
         }
       },
-      // নিচের ডেটাগুলো এখনও মক, কারণ ফ্রি API এগুলো দেয় না
       weekly: Array.from({ length: 7 }, (_, i) => ({
         day: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'][i],
         temp: Math.round(data.main.temp - 3 + Math.random() * 6),
         icon: data.weather[0].icon,
-        active: i === new Date().getDay() -1
+        active: i === new Date().getDay() - 1
       })),
       hourly: Array.from({ length: 4 }, (_, i) => ({
         time: i === 0 ? 'NOW' : new Date().getHours() + i,
@@ -151,53 +140,38 @@ function App() {
   };
 
   const handleApiError = (err) => {
-    console.error('Error fetching weather data:', err);
+    console.error('API Error:', err);
+    let message = 'Could not fetch weather data.';
     if (err.response) {
-      if (err.response.status === 404) {
-        setError('City not found. Please check the spelling.');
-      } else {
-        setError(`Failed to fetch data. Server responded with ${err.response.status}.`);
-      }
-    } else {
-      setError('Network error. Please check your connection.');
+      message = err.response.status === 404 ? 'City not found.' : `Server error: ${err.response.status}`;
+    } else if (err.request) {
+      message = 'Network error. Check your connection.';
     }
+    setError(message);
   };
 
- const handleCitySelect = (city) => {
-  // নিশ্চিত করুন যে 'city' অবজেক্টটি এবং এর প্রপার্টিগুলো বিদ্যমান
-  if (city && city.value === 'current') {
-    getCurrentLocation();
-  } else if (city && city.label) {
-    // city.label থেকে শুধুমাত্র শহরের নামটি বের করা হচ্ছে
-    const cityName = city.label.split(',')[0];
-    setLocationStatus('success');
-    fetchWeatherDataByCity(cityName);
-  } else {
-    // যদি কোনো কারণে ভুল ডেটা আসে, তাহলে কনসোলে এরর দেখানো হবে
-    console.error("Invalid city object received in handleCitySelect:", city);
-  }
-  
-  setShowCitySearch(false);
-};
+  const handleCitySelect = (city) => {
+    if (city && city.value === 'current') {
+      getCurrentLocation();
+    } else if (city && city.label) {
+      const cityName = city.label.split(',')[0];
+      setLocationStatus('success');
+      fetchWeatherDataByCity(cityName);
+    }
+    setShowCitySearch(false);
+  };
 
   const openCitySearch = () => {
     setShowCitySearch(true);
-    setError(null); // সার্চ খোলার সময় পুরনো এরর মুছে ফেলা হলো
+    setError(null);
   };
 
   const getWeatherIcon = (iconCode) => {
     if (!iconCode) return '☁️';
-    // OpenWeatherMap আইকন কোড ব্যবহার করে ইমোজি দেখানো হচ্ছে
     const iconMapping = {
-      '01d': '☀️', '01n': '🌙',
-      '02d': '⛅', '02n': '☁️',
-      '03d': '☁️', '03n': '☁️',
-      '04d': '☁️', '04n': '☁️',
-      '09d': '🌧️', '09n': '🌧️',
-      '10d': '🌦️', '10n': '🌧️',
-      '11d': '⛈️', '11n': '⛈️',
-      '13d': '❄️', '13n': '❄️',
-      '50d': '🌫️', '50n': '🌫️',
+      '01d': '☀️', '01n': '🌙', '02d': '⛅', '02n': '☁️', '03d': '☁️', '03n': '☁️',
+      '04d': '☁️', '04n': '☁️', '09d': '🌧️', '09n': '🌧️', '10d': '🌦️', '10n': '🌧️',
+      '11d': '⛈️', '11n': '⛈️', '13d': '❄️', '13n': '❄️', '50d': '🌫️', '50n': '🌫️',
     };
     return iconMapping[iconCode] || '☁️';
   };
@@ -210,10 +184,7 @@ function App() {
             <div className="loading-spinner"></div>
             <div className="loading-text">
               <h3>Getting Weather Data</h3>
-              <p>Please wait while we fetch the latest information...</p>
-              {locationStatus === 'detecting' && (
-                <small>📍 Detecting your location</small>
-              )}
+              <p>{location}</p>
             </div>
           </div>
         </div>
@@ -227,15 +198,11 @@ function App() {
         <div className="weather-card">
           <div className="error">
             <span className="error-icon">⚠️</span>
-            <h3>Oops! Something went wrong</h3>
+            <h3>Oops! An Error Occurred</h3>
             <p>{error}</p>
             <div className="error-actions">
-              <button onClick={() => getCurrentLocation()}>
-                🔄 Try Again
-              </button>
-              <button onClick={openCitySearch}>
-                🔍 Search City
-              </button>
+              <button onClick={getCurrentLocation}>🔄 Try Again</button>
+              <button onClick={openCitySearch}>🔍 Search Manually</button>
             </div>
           </div>
         </div>
@@ -243,14 +210,11 @@ function App() {
     );
   }
 
-  if (!weatherData) {
-    return null; // যদি কোনো ডেটা না থাকে, কিছুই রেন্ডার হবে না
-  }
+  if (!weatherData) return null;
 
   return (
     <div className="app">
       <div className="weather-card">
-        {/* Header */}
         <div className="header">
           <div className="location-info">
             <span className="thermometer-icon">📍</span>
@@ -258,20 +222,14 @@ function App() {
               <span className="location-text">{location}</span>
               <span className="location-status">
                 {locationStatus === 'success' && 'Current Location'}
-                {locationStatus === 'fallback' && 'Default Location'}
+                {locationStatus === 'fallback' && 'Approximate Location'}
               </span>
             </div>
           </div>
-          <button
-            className="add-location-btn"
-            onClick={openCitySearch}
-            title="Search for a city"
-          >
+          <button className="add-location-btn" onClick={openCitySearch} title="Search for a city">
             <span className="search-icon">🔍</span>
           </button>
         </div>
-
-        {/* Current Weather */}
         <div className="current-weather">
           <div className="temperature-section">
             <h1 className="temperature">{weatherData.current.temp}°</h1>
@@ -283,8 +241,6 @@ function App() {
             <p className="condition-text">{weatherData.current.condition}</p>
           </div>
         </div>
-
-        {/* Weather Details */}
         <div className="weather-details">
           <div className="detail-item" title="How the temperature actually feels">
             <span className="detail-icon">🌡️</span>
@@ -303,22 +259,16 @@ function App() {
           <div className="detail-item" title="Air moisture level">
             <span className="detail-icon">💧</span>
             <div className="detail-info">
-              <span className="detail-label">Humidity</span>
-              <span className="detail-value">{weatherData.current.details.humidity}%</span>
+              <span className="label">Humidity</span>
+              <span className="value">{weatherData.current.details.humidity}%</span>
             </div>
           </div>
         </div>
-
-        {/* Weekly & Hourly Forecasts (এখনও মক ডেটা ব্যবহার করছে) */}
         <div className="weekly-forecast">
           <h3 className="section-title">7-Day Forecast</h3>
           <div className="week-days">
             {weatherData.weekly.map((day, index) => (
-              <div
-                key={index}
-                className={`day-item ${day.active ? 'active' : ''}`}
-                title={`${day.day}: ${day.temp}°C`}
-              >
+              <div key={index} className={`day-item ${day.active ? 'active' : ''}`} title={`${day.day}: ${day.temp}°C`}>
                 <span className="day-name">{day.day}</span>
                 <div className="day-icon">{getWeatherIcon(day.icon)}</div>
                 <span className="day-temp">{day.temp}°</span>
@@ -326,16 +276,11 @@ function App() {
             ))}
           </div>
         </div>
-
         <div className="hourly-forecast">
           <h3 className="section-title">Hourly Forecast</h3>
           <div className="hourly-items">
             {weatherData.hourly.map((hour, index) => (
-              <div
-                key={index}
-                className={`hourly-item ${hour.active ? 'active' : ''}`}
-                title={`${hour.time === 'NOW' ? 'Current time' : hour.time + ':00'}: ${hour.temp}°C`}
-              >
+              <div key={index} className={`hourly-item ${hour.active ? 'active' : ''}`} title={`${hour.time === 'NOW' ? 'Current time' : hour.time + ':00'}: ${hour.temp}°C`}>
                 <span className="hour-time">{hour.time}</span>
                 <div className="hour-icon">{getWeatherIcon(hour.icon)}</div>
                 <span className="hour-temp">{hour.temp}°</span>
@@ -343,21 +288,12 @@ function App() {
             ))}
           </div>
         </div>
-
-        {/* Weather Chart */}
         <div className="chart-section">
           <h3 className="section-title">Temperature Trend</h3>
           <WeatherChart data={weatherData.chartData} />
         </div>
       </div>
-
-      {/* City Search Modal */}
-      <CitySearch
-        isOpen={showCitySearch}
-        onClose={() => setShowCitySearch(false)}
-        onCitySelect={handleCitySelect}
-        apiKey={API_KEY}
-      />
+      <CitySearch isOpen={showCitySearch} onClose={() => setShowCitySearch(false)} onCitySelect={handleCitySelect} apiKey={API_KEY} />
     </div>
   );
 }

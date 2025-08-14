@@ -100,7 +100,7 @@
 .search-icon {
   position: absolute;
   top: 50%;
-  right: clamp(16px, 5vw, 48px);
+  right: -20px;
   transform: translateY(-50%);
   background-color: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -115,7 +115,7 @@
   opacity: 1;
   cursor: pointer;
   transition: background-color 0.3s ease;
-  margin-right: -23px;
+  margin-right: 45px;
 }
 .search-icon:hover {
   background-color: rgba(255, 255, 255, 0.25);
@@ -333,7 +333,7 @@
   }
 
   .search-icon {
-    right: 28px;
+    right: -30px;
   }
 }
 
